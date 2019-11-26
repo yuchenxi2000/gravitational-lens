@@ -6,24 +6,22 @@
 
 不解释，上图。
 
-![Icon](https://github.com/yuchenxi2000/gravitational-lens/blob/master/pics/photon88.bmp)
-
-![Icon](https://github.com/yuchenxi2000/gravitational-lens/blob/master/pics/photon0.bmp)
+![Icon](https://github.com/yuchenxi2000/gravitational-lens/blob/master/pics/res6000-r800-d50-small.jpg)
 
 ## 光子轨迹具体是怎么算的？
 
-见"数学推导.pdf"。
+见 archive/数学推导.pdf
 
 自己算的。如果有错欢迎指正。
 
+纠错（2019-11-26）：
+
+1. 第5页开头theta_m少了一个常数1/w/sqrt(1+m)
+
+2. 轨道常数D的计算过于复杂，其实D=1/sqrt(cc)。（第1页第5行方程直接取u=0，注意D=d{theta}/du=1/sqrt(cc)）
+3. pdf里使用的图片采样方式是平铺，新版c++程序里使用天空盒。
+
 ## 我也想跑程序渲染图片。
 
-你需要如下library:
+src里c++代码自行编译。其中GNU Scientific Library需要自行下载、安装。
 
-1. glew（OpenGL相关的库）
-2. glfw（OpenGL相关的库）
-3. opengl（显卡要支持）
-4. SOIL（图像加载、存储的库。比较简陋。）
-5. GSL（GNU科学计算库）
-
-我觉得123不需要，但是SOIL没有这些运行不起来。我用123成功编译，但可能有其他的解决办法。
