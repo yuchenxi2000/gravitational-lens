@@ -28,3 +28,6 @@
 
 src里c++代码自行编译。其中GNU Scientific Library需要自行下载、安装。
 
+## 渲染视频
+
+见 video-rendering/README.txt
