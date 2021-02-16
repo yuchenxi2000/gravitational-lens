@@ -8,7 +8,6 @@
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/vector_angle.hpp>
 
-// gsl 不能并行。。
 #include <Eigen/Core>
 #include <Eigen/Eigenvalues>
 
@@ -33,14 +32,10 @@ ostream & operator << (ostream & os, const Mat3 & m) {
     return os;
 }
 
+// line in 3-space
 struct Line3D {
     Vec3 v; // direction vector
     Vec3 r; // a point on the line
-};
-
-struct ScatterInfo {
-    double theta; // rotate angle
-    double d; // distance between ray and center of hole
 };
 
 /*
@@ -54,27 +49,10 @@ void poly_solve_cubic(double c2, double c1, double c0, double * e1, double * e2,
     m(1, 2) = -c1;
     m(2, 2) = -c2;
     auto r = m.eigenvalues();
+    // e1 > e2 > e3
     *e3 = r(0).real();
     *e2 = r(1).real();
     *e1 = r(2).real();
-}
-
-/*
- * param cc: orbit constant in formula
- */
-ScatterInfo scatter(double cc) {
-    ScatterInfo res;
-    
-    res.d = 1 / sqrt(cc);
-    
-    double e1, e2, e3;
-    poly_solve_cubic(-0.5, 0.0, cc / 2.0, &e1, &e2, &e3);
-    double w = sqrt(8.0 / (e1 - e3));
-    double k = sqrt((e2 - e3) / (e1 - e3));
-    double theta0 = acos(sqrt(e2 / (e2 - e3)));
-    res.theta = w * (std::ellint_1(k, M_PI_2) - std::ellint_1(k, theta0));
-    
-    return res;
 }
 
 /*
@@ -82,26 +60,79 @@ ScatterInfo scatter(double cc) {
  * returns false if photon fell into the black hole
  */
 bool transform(const Line3D & l1, Line3D & l2, const Vec3 & hole_pos) {
-    // calculate cc
-    double r = glm::distance(l1.r, hole_pos);
-    Vec3 d = glm::normalize(l1.v);
-    Vec3 vr = hole_pos - l1.r;
-    double rd = glm::dot(vr, d);
-    double cc =  1 / (r * r - rd * rd) - 2 / (r * r * r);
-    
+    // calculate delta
+    Vec3 v1 = glm::normalize(l1.v);
+    Vec3 r1 = hole_pos - l1.r;
+    double r0 = glm::l2Norm(r1);
+    double rd = glm::dot(r1, v1);  // r0 cos(phi), phi = <vr, v1>
+    double delta =  1 / (r0 * r0 - rd * rd) - 2 / (r0 * r0 * r0);
+
     // photon fell into the black hole
-    if (cc <= 0 || cc >= 1.0 / 27.0) {
+    if (delta <= 0) {
         return false;
+    } else if (delta >= 1.0 / 27.0 - 1e-9 && delta <= 1.0 / 27.0 + 1e-9) {
+        // near 1.0 / 27.0
+        // TODO:
+        return false;
+    } else if (delta > 1.0 / 27.0) {
+        double phi0 = acos(rd / r0);  // acos in [0, pi]
+        if (phi0 <= M_PI_2) {
+            // fell into the black hole
+            return false;
+        }
+        // scattering param D
+        double D = 1 / sqrt(delta);
+        double e1, e2, e3;
+        poly_solve_cubic(-0.5, 0.0, 0.5 * delta, &e1, &e2, &e3);
+        double lambda2 = sqrt(3 * e3 * e3 - e3);
+        double u0 = 1.0 / r0;
+        double s0 = (u0 - e3 - lambda2) / (u0 - e3 + lambda2);
+        double s_inf = (-e3 - lambda2) / (-e3 + lambda2);
+        double k = sqrt(0.5 - 0.125 * (6.0 * e3 - 1) / lambda2);
+        double delta_theta = 1.0 / sqrt(2 * lambda2) * (std::ellint_1(k, acos(s_inf)) - std::ellint_1(k, acos(s0)));
+        double alpha = delta_theta + phi0 - M_PI;
+
+        // rotation matrix
+        Vec3 normal = glm::normalize(glm::cross(l1.v, r1));
+        Mat3 m = glm::rotate(alpha, normal);
+
+        // rotate
+        l2.v = m * l1.v;
+        l2.r = hole_pos + D * glm::normalize(glm::cross(l2.v, normal));
+
+        return true;
+    } else {
+        // scattering param D
+        double D = 1 / sqrt(delta);
+
+        // rotation angle alpha
+        double e1, e2, e3;
+        // u^3 - 0.5 * u^2 + 0.5 * delta = 0.0
+        poly_solve_cubic(-0.5, 0.0, 0.5 * delta, &e1, &e2, &e3);
+        double w_inv = sqrt(2.0 / (e1 - e3));
+        double k = sqrt((e2 - e3) / (e1 - e3));
+        double u0 = 1.0 / r0;
+        double s0 = sqrt((u0 - e3) / (e2 - e3));
+        double s_inf = sqrt((-e3) / (e2 - e3));
+        double delta_theta;
+        double phi0 = acos(rd / r0);  // acos in [0, pi]
+        if (phi0 < M_PI_2) {
+            delta_theta = w_inv * (2 * std::ellint_1(k, M_PI_2) - std::ellint_1(k, asin(s0)) - std::ellint_1(k, asin(s_inf)));
+        } else {
+            delta_theta = w_inv * (std::ellint_1(k, asin(s0)) - std::ellint_1(k, asin(s_inf)));
+        }
+        double alpha = delta_theta + phi0 - M_PI;
+
+        // rotation matrix
+        Vec3 normal = glm::normalize(glm::cross(l1.v, r1));
+        Mat3 m = glm::rotate(alpha, normal);
+
+        // rotate
+        l2.v = m * l1.v;
+        l2.r = hole_pos + D * glm::normalize(glm::cross(l2.v, normal));
+
+        return true;
     }
-    
-    Vec3 k = glm::normalize(glm::cross(l1.v, vr));
-    ScatterInfo scatterinfo = scatter(cc);
-    Mat3 m = glm::rotate(scatterinfo.theta-M_PI, k);
-    
-    l2.v = m * l1.v;
-    l2.r = hole_pos + scatterinfo.d * glm::normalize(glm::cross(l2.v, k));
-    
-    return true;
 };
 
 class Image {
@@ -128,33 +159,10 @@ public:
     }
     unsigned char & operator () (int w, int h, int ch) const {
         return data[channel * (width * h + w) + ch];
-        // return data[channel * (height * w + h) + ch];
     }
     
     int size() {
         return width * height * channel;
-    }
-    
-    // get a new blank image
-    void blankImage(int w, int h, int ch) {
-        this->width = w;
-        this->height = h;
-        this->channel = ch;
-        if (data) delete [] data;
-        data = new unsigned char[w * h * ch]();
-    }
-    
-    bool isNull() {
-        return data == 0;
-    }
-    
-    // delete image buffer
-    void clear() {
-        if (data) delete [] data;
-        this->data = 0;
-        this->width = 0;
-        this->height = 0;
-        this->channel = 0;
     }
 };
 
@@ -227,7 +235,9 @@ public:
         }
         double theta = M_PI_2-asin(R.y/background_d);
         int xi = phi/(2*M_PI)*(image.width+1);
+        if (xi < 0 || xi >= image.width) return;
         int yi = theta/(M_PI)*(image.height+1);
+        if (yi < 0 || yi >= image.height) return;
         for (int c = 0; c < image.channel; ++c) {
             outcolor[c] = image(xi, yi, c);
         }
@@ -280,19 +290,6 @@ extern "C" {
         Vec3 view = d3_to_vec3(view_d3);
         Vec3 x_axis = glm::normalize(d3_to_vec3(x_axis_d3));
         Vec3 y_axis = glm::normalize(glm::cross(x_axis, view));
-
-        // std::cout << d3_to_vec3(pos_d3) << std::endl;
-        // std::cout << view << std::endl;
-        // std::cout << x_axis << std::endl;
-        // std::cout << img_scale << std::endl;
-        // std::cout << sphere_r << std::endl;
-        // std::cout << in_width << std::endl;
-        // std::cout << in_height << std::endl;
-        // std::cout << in_channel << std::endl;
-        // std::cout << out_width << std::endl;
-        // std::cout << out_height << std::endl;
-        // std::cout << std::hex << (unsigned long long)in_img << std::endl;
-        // std::cout << std::hex << (unsigned long long)out_img << std::endl;
 
     #pragma omp parallel for
         for (int i = 0; i < outimage.width; ++i) {

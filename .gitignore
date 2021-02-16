@@ -1,2 +1,5 @@
 .DS_Store
 hidden
+.idea/
+*.dylib
+test*.py
