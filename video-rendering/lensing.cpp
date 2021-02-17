@@ -72,8 +72,37 @@ bool transform(const Line3D & l1, Line3D & l2, const Vec3 & hole_pos) {
         return false;
     } else if (delta >= 1.0 / 27.0 - 1e-9 && delta <= 1.0 / 27.0 + 1e-9) {
         // near 1.0 / 27.0
-        // TODO:
-        return false;
+        double phi0 = acos(rd / r0);  // acos in [0, pi]
+        if (phi0 <= M_PI_2) {
+            // fell into the black hole
+            return false;
+        }
+
+        double u0 = 1.0 / r0;
+        if (u0 >= 1.0 / 3.0) return false;
+
+        // scattering param D
+        double D = 1 / sqrt(delta);
+        double e1, e2, e3;
+        poly_solve_cubic(-0.5, 0.0, 0.5 * delta, &e1, &e2, &e3);
+        e1 = 0.5 * (e1 + e2);
+
+        double a = sqrt(e1 - e3);
+        double x0 = sqrt(u0 - e3);
+        double x_inf = sqrt(-e3);
+        double w_inv = 0.5 / a;
+        double delta_theta = w_inv * (log((a - x0) / (a + x0)) - log((a - x_inf) / (a + x_inf)));
+        double alpha = delta_theta + phi0 - M_PI;
+
+        // rotation matrix
+        Vec3 normal = glm::normalize(glm::cross(l1.v, r1));
+        Mat3 m = glm::rotate(alpha, normal);
+
+        // rotate
+        l2.v = m * l1.v;
+        l2.r = hole_pos + D * glm::normalize(glm::cross(l2.v, normal));
+
+        return true;
     } else if (delta > 1.0 / 27.0) {
         double phi0 = acos(rd / r0);  // acos in [0, pi]
         if (phi0 <= M_PI_2) {
