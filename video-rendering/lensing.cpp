@@ -319,7 +319,13 @@ extern "C" {
         Vec3 view = d3_to_vec3(view_d3);
         Vec3 x_axis = glm::normalize(d3_to_vec3(x_axis_d3));
         Vec3 y_axis = glm::normalize(glm::cross(x_axis, view));
-
+    /*
+     * TODO:
+     * 这里的采样方式有问题。
+     * 这里采用全局坐标，事实上应当使用观察者的局域坐标系。
+     * 局域坐标系与运动状态有关，很复杂，等我有空再弄。
+     * 但是如果离黑洞较远（r趋于无穷），局域坐标系可以近似为全局坐标。
+     */
     #pragma omp parallel for
         for (int i = 0; i < outimage.width; ++i) {
             for (int j = 0; j < outimage.height; ++j) {

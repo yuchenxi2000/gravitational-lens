@@ -11,7 +11,7 @@ in_width = ctypes.c_int(background.shape[1])
 in_height = ctypes.c_int(background.shape[0])
 channels = ctypes.c_int(background.shape[2])
 
-lib = np.ctypeslib.load_library(libname='liblensing.dylib', loader_path='.')
+lib = np.ctypeslib.load_library(libname='liblensing', loader_path='.')
 
 img_scale = ctypes.c_double(1200.0)
 
