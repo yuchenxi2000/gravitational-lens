@@ -4,7 +4,9 @@
 
 一个计算黑洞引力透镜效应的demo。
 
-不解释，上图。
+B站视频 https://www.bilibili.com/video/BV1bo4y1973Q
+
+demo图
 
 ![Icon](https://github.com/yuchenxi2000/gravitational-lens/blob/master/pics/res6000-r800-d50-small.jpg)
 
